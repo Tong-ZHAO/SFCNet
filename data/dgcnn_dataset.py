@@ -28,7 +28,7 @@ class DGCNNDataset(Dataset):
         self.root = root
         self.file_list = file_list
         self.sharp_thresh = sharp_thresh
-        self.point_noise_level = point_noise_level if flag_test else 0.
+        self.point_noise_level = point_noise_level if not flag_test else 0.
         self.random_engine = np.random.RandomState(seed)
         self.flag_test = flag_test
 
