@@ -10,6 +10,8 @@ from sklearn.metrics import jaccard_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import accuracy_score
 
+from scipy import spatial
+
 import torch
 import argparse
 
@@ -18,35 +20,28 @@ from dgcnn_dataset import DGCNNDataset
 from dgcnn_sfcnet import SFCNetWithDGCNN
 
 
-def get_distance_to_sharp_cruve(samples, preds, offsets, m_primitives, m_verts):
+def compute_chamfer_distance(preds, gts):
 
-    preds_tag = (preds >= 0.)
-    sharp_pts = samples[preds_tag] + offsets[preds_tag]
-    ldists = []
-    if sharp_pts.shape[0]==0:
-        return 0
+    tree_pred_to_gt = spatial.cKDTree(gts, copy_data = False, balanced_tree = False, compact_nodes = False)
+    dist_pred_to_gt = tree_pred_to_gt.query(preds, k = 1)[0]
+    dist_pred_to_gt = dist_pred_to_gt.mean()
 
-    for i in range(len(m_primitives)):
-        dists = dist_from_points_to_primitive(m_primitives[i], sharp_pts, m_verts)[0]
-        ldists.append(dists)
+    tree_gt_to_pred = spatial.cKDTree(preds, copy_data = False, balanced_tree = False, compact_nodes = False)
+    dist_gt_to_pred = tree_gt_to_pred.query(gts, k = 1)[0]
+    dist_gt_to_pred = dist_gt_to_pred.mean()
 
-    ldists = np.array(ldists).T
-    indices = np.argmin(ldists, axis = 1)
-    dists = ldists[np.arange(len(sharp_pts)), indices]
-
-    return np.mean(dists)
+    return dist_pred_to_gt, dist_pred_to_gt + dist_gt_to_pred
 
 
 if __name__ == '__main__':
 
     # Parameters
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataRoot', type = str, default = '../datasets/ABC_dataset/', help = 'file root')
-    parser.add_argument('--testList', type = str, default = 'test_models.csv', help = 'test list')
-    parser.add_argument('--modelPath', type = str, default = '../log/18-01-22_18-57/model_epoch5.pth', help = 'pretrained model')
+    parser.add_argument('--dataRoot', type = str, default = '../datasets/ABC_test/', help = 'file root')
+    parser.add_argument('--testList', type = str, default = '../datasets/ABC_test/test_list_new.txt', help = 'evaluation list')
+    parser.add_argument('--modelPath', type = str, default = '../pretrained_models/pretrained_sfcnet_dgcnn/pretrained_sfcnet_dgcnn_new.pth', help = 'pretrained model')
     parser.add_argument('--numNb', type = int, help = 'number of neighbors used in DGCNN (should be the same for training)', default = 20)
-    parser.add_argument('--batchSize', type = int, help = 'batch size', default = 8)
-    parser.add_argument('--sharpThresh', type=float, help='threshold for sharp features (should be the same for training)', default=0.03)
+    parser.add_argument('--batchSize', type = int, help = 'batch size', default = 2)
 
     opt = parser.parse_args()
     print (opt)
@@ -58,8 +53,8 @@ if __name__ == '__main__':
 
     # Create Dataset
     print("Loading test dataset...")
-    test_data = DGCNNDataset(root=opt.dataRoot, file_list=opt.trainList, sharp_thresh=opt.sharpThresh, flag_test=True)
-    test_loader = torch.utils.data.DataLoader(test_data, batch_size=opt.batchSize, shuffle=False)
+    test_data = DGCNNDataset(root=opt.dataRoot, file_list = opt.testList, flag_test = True)
+    test_loader = torch.utils.data.DataLoader(test_data, batch_size = opt.batchSize, shuffle = False)
     print("  Number of test files: ", len(test_data))
     print("  Number of test batches: ", len(test_loader))
 
@@ -73,7 +68,7 @@ if __name__ == '__main__':
     print("Load pretrained model: ", opt.modelPath)
 
     # Evaluation
-    print("Begin evaluation...")
+    print("Begin testing...")
     model.eval()
 
     with torch.no_grad():
@@ -85,28 +80,39 @@ if __name__ == '__main__':
         f1_total = 0
         accuracy_total = 0
         average_distance_curve_total = 0
+        average_chamfer_total = 0
 
-        for samples, file_name, labels, offsets in test_loader:
+        for samples, file_names, centers, scales in test_loader:
             # model prediction
             samples = samples.float().to(device)
             y_pred, y_offsets = model(samples)
             # get results
             samples = samples.cpu().data.numpy()
-            labels = labels.cpu().data.numpy()
             y_pred = y_pred.cpu().data.numpy()
             y_offsets = y_offsets.cpu().data.numpy()
+            centers = centers.cpu().data.numpy()
+            scales = scales.cpu().data.numpy()
             # compute metrics
             for i in range(samples.shape[0]):
-                m_verts, center, scale = read_obj_and_normalize(os.path.join(opt.dataRoot, file_name[i] + ".obj"))
-                m_primitives = read_yml(os.path.join(opt.dataRoot, file_name[i] + ".yml"), center, scale)
+                # classification
+                labels = np.loadtxt(os.path.join(opt.dataRoot, file_names[i].split('_')[0] + '.cla'))[:, 0]
                 preds = np.squeeze(y_pred[i])
                 preds_tag = (preds >= 0.)
-                recall_total += recall_score(np.squeeze(labels[i]), preds_tag, average = 'binary')
-                precision_total += precision_score(np.squeeze(labels[i]), preds_tag, average = 'binary')
-                iou_total += jaccard_score(np.squeeze(labels[i]), preds_tag, average = 'binary')
-                f1_total += f1_score(np.squeeze(labels[i]), preds_tag, average = 'binary')
-                accuracy_total += accuracy_score(np.squeeze(labels[i]), preds_tag)
-                average_distance_curve_total += get_distance_to_sharp_cruve(samples[i], preds,y_offsets[i], m_primitives, m_verts)
+
+                recall_total += recall_score(labels, preds_tag, average = 'binary')
+                precision_total += precision_score(labels, preds_tag, average = 'binary')
+                iou_total += jaccard_score(labels, preds_tag, average = 'binary')
+                f1_total += f1_score(labels, preds_tag, average = 'binary')
+                accuracy_total += accuracy_score(labels, preds_tag)
+
+                # distance
+                sharp_preds = samples[i, preds_tag] + y_offsets[i, preds_tag]
+                sharp_gt = np.loadtxt(os.path.join(opt.dataRoot, file_names[i].split('_')[0] + '_gt.xyz'))
+                sharp_gt = (sharp_gt - centers[i].reshape((1, -1))) / scales[i]
+                distance_curve, chamfer = compute_chamfer_distance(sharp_preds, sharp_gt)
+                average_distance_curve_total += distance_curve
+                average_chamfer_total += chamfer
+
             # print progress
             total_samples += samples.shape[0]
             if total_samples > 0 and np.abs(total_samples % 100) == 0:
@@ -119,11 +125,15 @@ if __name__ == '__main__':
         f1_total /= len(test_data)
         accuracy_total /= len(test_data)
         average_distance_curve_total /= len(test_data)
+        average_chamfer_total /= len(test_data)
 
         # print metrics
-        print("average_distance_curve_total: %f\n" % average_distance_curve_total)
-        print("recall_total: %f\n" % recall_total)
-        print("precision_total: %f\n" % precision_total)
-        print("iou_total: %f\n" % iou_total)
-        print("f1_total: %f\n" % f1_total)
-        print("accuracy_total: %f\n" % accuracy_total)
+        print("Results:")
+        print("  - recall_total: %f" % recall_total)
+        print("  - precision_total: %f" % precision_total)
+        print("  - iou_total: %f" % iou_total)
+        print("  - f1_total: %f" % f1_total)
+        print("  - accuracy_total: %f\n" % accuracy_total)
+
+        print("  - average_distance_curve_total: %f" % average_distance_curve_total)
+        print("  - average_chamfer_total: %f" % average_chamfer_total)

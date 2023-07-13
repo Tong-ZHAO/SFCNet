@@ -23,27 +23,27 @@ class SFCNetWithDGCNN(nn.Module):
         # feature fusion
         self.conv1 = nn.Sequential( nn.Conv1d(1472, 512, 1),
                                     nn.BatchNorm1d(512),
-                                    F.relu())
+                                    nn.ReLU())
         self.conv2 = nn.Sequential( nn.Conv1d(512, 256, 1),
                                     nn.BatchNorm1d(256),
-                                    F.relu())
+                                    nn.ReLU())
         
         # regression branch (predicting offset)
         self.mlp_offset_prob1 = nn.Sequential( nn.Conv1d(256, 256, 1),
                                                nn.BatchNorm1d(256),
-                                               F.relu())
+                                               nn.ReLU())
         self.mlp_offset_prob2 = nn.Conv1d(256, 3, 1)
         
         # classification branch (predicting label)
         self.mlp_boundary_prob1 = nn.Sequential( nn.Conv1d(256, 256, 1),
                                                  nn.BatchNorm1d(256),
-                                                 F.relu())
+                                                 nn.ReLU())
         self.mlp_boundary_prob2 = nn.Sequential( nn.Conv1d(256, 64, 1),
                                                  nn.BatchNorm1d(64),
-                                                 F.relu())
+                                                 nn.ReLU())
         self.mlp_boundary_prob3 = nn.Sequential( nn.Conv1d(64, 16, 1),
                                                  nn.BatchNorm1d(16),
-                                                 F.relu())
+                                                 nn.ReLU())
         self.mlp_boundary_prob4 = nn.Conv1d(16, 1, 1)
 
 
@@ -81,9 +81,9 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using device: ", device)
 
-    model = SFCNetWithDGCNN(device = device)
+    model = SFCNetWithDGCNN(device = device, nn_nb = 18)
     model.to(device)
-    summary(model, input_size = (-1, 10000, 3))
+    #summary(model, input_size = (10000, 3))
 
     pts = torch.rand(1, 10000, 3).to(device)
     y_bd, y_off = model(pts)

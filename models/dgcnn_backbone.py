@@ -89,7 +89,7 @@ class DGCNNEncoderGn(nn.Module):
                                     nn.LeakyReLU(negative_slope = 0.2) )
         self.mlp1 = nn.Sequential(  nn.Conv1d(448, 1024, 1),
                                     nn.BatchNorm1d(1024),
-                                    nn.functional.relu() )
+                                    nn.ReLU())
 
 
     def forward(self, x):
@@ -123,9 +123,9 @@ if __name__ == '__main__':
     device = torch.device("cuda:0" if use_cuda else "cpu")
     print("Using device: ", device)
 
-    model = DGCNNEncoderGn()
+    model = DGCNNEncoderGn(nn_nb = 18)
     model.to(device)
-    summary(model, input_size = (-1, 3, 10000))
+    summary(model, input_size = (3, 10000))
 
     pts = torch.rand(1, 3, 10000).to(device)
     y, y_feats = model(pts)

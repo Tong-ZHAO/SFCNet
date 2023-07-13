@@ -33,7 +33,7 @@ class DGCNNDataset(Dataset):
         self.flag_test = flag_test
 
         with open(file_list, "r") as fp:
-            self.file_list = fp.read().split()[:-1]
+            self.file_list = fp.read().split()
 
     #----------------------------  Dataset ----------------------------#
     
@@ -54,7 +54,7 @@ class DGCNNDataset(Dataset):
             # read files: xyz, obj and yml
             m_verts, center, sacle = read_obj_and_normalize(os.path.join(self.root, file_name + ".obj"))
             m_primitives = read_yml(os.path.join(self.root, file_name + ".yml"), center, sacle)
-            samples = read_xyz(os.path.join(self.root, file_name + ".xyz"), center, sacle, self.with_normal)
+            samples = read_xyz(os.path.join(self.root, file_name + ".xyz"), center, sacle, False)
             # add noise if training
             if abs(self.point_noise_level) > 1e-10:
                 samples = samples + self.point_noise_level * self.random_engine.uniform(-1., 1., size = samples.shape)
@@ -70,8 +70,10 @@ class DGCNNDataset(Dataset):
 
 if __name__ == '__main__':
 
-    data = DGCNNDataset('../datasets/ABC_dataset', '../datasets/ABC_dataset/train_models.csv')
-    
+    data = DGCNNDataset('../datasets/abc_dataset', '../datasets/abc_dataset/train_models.csv')
+
+    print('Length of dataset: ', len(data))
+
     X, Y, offsets = data[0]
     print("Samples shape: ", X.shape)
     print("Labels shape: ", Y.shape)

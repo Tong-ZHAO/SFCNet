@@ -17,8 +17,8 @@ if __name__ == '__main__':
     # Parameters
     parser = argparse.ArgumentParser()
     parser.add_argument('--testFile', type = str, default = '../datasets/examples/00000006.xyz', help = 'test file')
-    parser.add_argument('--modelPath', type = str, default = '../log/18-01-22_18-57/model_epoch5.pth', help = 'pretrained model')
-    parser.add_argument('--outPath', type = str, default = './test', help = 'file root for saving results')
+    parser.add_argument('--modelPath', type = str, default = '../pretrained_models/pretrained_sfcnet_dgcnn/pretrained_sfcnet_dgcnn_new.pth', help = 'pretrained model')
+    parser.add_argument('--outPath', type = str, default = '../test', help = 'file root for saving results')
     parser.add_argument('--numNb', type = int, help = 'number of neighbors used in DGCNN (should be the same for training)', default = 20)
 
     opt = parser.parse_args()
@@ -46,22 +46,26 @@ if __name__ == '__main__':
     model.eval()
 
     with torch.no_grad():    
-        samples = torch.from_numpy(samples[np.newaxis, -1, 3]).float().to(device)
+        samples = torch.from_numpy(samples.reshape((1, -1, 3))).float().to(device)
         y_pred, y_offsets = model(samples)
         # get results
+        samples = np.squeeze(samples.cpu().data.numpy())
         y_pred = y_pred.cpu().data.numpy()
         y_offsets = y_offsets.cpu().data.numpy()
 
     # save results
     out_name = opt.testFile.split('/')[-1].rstrip('.xyz')
-    preds_tag = (y_pred >= 0.)
-    sharp_pts = samples[preds_tag] + y_offsets[preds_tag]
+    preds_tag = np.squeeze(y_pred >= 0.)
+    sharp_pts = samples[preds_tag] + y_offsets[0, preds_tag]
     sharp_pts = sharp_pts * scale + center.reshape((1, -1))
 
     # consolidated sharp feature points
     with open(os.path.join(opt.outPath, out_name + '_sharp_offset.xyz'), 'w') as fp:
         fp.write('\n'.join([" ".join(line) for line in sharp_pts.astype(str)]))
+
     # raw points that recognized as sharp feature points
     pred_pts = samples[preds_tag] * scale + center.reshape((1, -1))
     with open(os.path.join(opt.outPath, out_name + '_sharp.xyz'), 'w') as fp:
         fp.write('\n'.join([" ".join(line) for line in pred_pts.astype(str)]))
+
+    print("Finish!")

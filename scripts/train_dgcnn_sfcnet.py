@@ -23,12 +23,12 @@ if __name__ == '__main__':
     # naming / file handlingcd
     parser.add_argument('--dataRoot', type = str, default = '../datasets/ABC_dataset/', help = 'file root')
     parser.add_argument('--logDir', type=str, default='../logs', help='training log folder')
-    parser.add_argument('--trainList', type = str, default = 'train_models.csv', help = 'train list')
-    parser.add_argument('--valList', type = str, default = 'val_models.csv', help = 'val list')
+    parser.add_argument('--trainList', type = str, default = '../datasets/ABC_dataset/train_models.csv', help = 'train list')
+    parser.add_argument('--valList', type = str, default = '../datasets/ABC_dataset/val_models.csv', help = 'val list')
     parser.add_argument('--workers', type = int, help = 'number of data loading workers', default = 4)
     # training parameters
     parser.add_argument('--numNb', type = int, help = 'number of neighbors used in DGCNN', default = 20)
-    parser.add_argument('--batchSize', type = int, help = 'batch size', default = 8)
+    parser.add_argument('--batchSize', type = int, help = 'batch size', default = 2)
     parser.add_argument('--sharpThresh', type = float, help = 'threshold for sharp features', default = 0.03)
     parser.add_argument('--pointNoise', type = float, help = 'noise level for point cloud', default = 0.01)
     parser.add_argument('--numFirstStage', type = int, help = 'number of epochs in the first stage', default = 10)
@@ -147,8 +147,6 @@ if __name__ == '__main__':
         tloss = total_loss / total_samples
         tpred = total_pred_loss / total_samples
         toffset = total_offset_loss / total_samples
-        #vis_losses[train_data.get_level() - 2] = tloss 
-        #vis_accus[train_data.get_level() - 2] = acc  
 
         print("%d epoch training results: " % epoch)
         print("  * Total train Loss: ", tloss, ", total train pred loss:", tpred, ", total train offset loss: ", toffset, ", total train accuracy is: ", tacc)

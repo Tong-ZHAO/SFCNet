@@ -209,6 +209,6 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,visualstudiocode,linux
 
-.xyz
-.yml
-.obj
+*.xyz
+*.yml
+*.obj
